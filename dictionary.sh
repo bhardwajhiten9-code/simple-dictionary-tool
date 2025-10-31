@@ -49,27 +49,43 @@ search_online() {
     echo -e "${RED}❌ curl not installed. Cannot fetch online meaning.${RESET}"
     return 1
   fi
+
   loading
   local response
   response=$(curl -s "https://api.dictionaryapi.dev/api/v2/entries/en/$word")
+
+  # Check if API returned "No Definitions Found"
+  if echo "$response" | grep -q '"title": "No Definitions Found"'; then
+    echo -e "${RED}❌ No definition found online for '${word}'.${RESET}"
+    return 1
+  fi
+
   if command -v jq >/dev/null 2>&1; then
-    local meaning
+    local meaning pos pronunciation
     meaning=$(echo "$response" | jq -r '.[0].meanings[0].definitions[0].definition' 2>/dev/null)
+    pos=$(echo "$response" | jq -r '.[0].meanings[0].partOfSpeech' 2>/dev/null)
+    pronunciation=$(echo "$response" | jq -r '.[0].phonetic // empty' 2>/dev/null)
+
     if [ "$meaning" != "null" ] && [ -n "$meaning" ]; then
-      echo -e "${GREEN}$word:${RESET} $meaning"
+      echo -e "${GREEN}$word (${pos})${RESET}"
+      [ -n "$pronunciation" ] && echo -e "${CYAN}Pronunciation:${RESET} $pronunciation"
+      echo -e "Meaning: ${YELLOW}$meaning${RESET}"
+      # Save fetched meaning locally
+      echo "$word: $meaning" >> words.txt
       return 0
     fi
   else
-    # Fallback if jq is missing
     echo -e "${CYAN}Raw response:${RESET}"
     echo "$response" | head -c 200
   fi
+
   return 1
 }
 
 # 🚀 Main Script
 header
 
+# Take word as argument or ask user
 if [ -z "$1" ]; then
   read -rp "Enter a word to search: " WORD
 else
@@ -91,5 +107,12 @@ elif search_online "$WORD"; then
   exit 0
 else
   echo -e "${RED}❌ No definition found for '$WORD'.${RESET}"
-  echo -e "${YELLOW}Tip:${RESET} Try checking your internet or adding it to words.txt"
+  read -rp "➕ Add your own meaning? (y/n): " choice
+  if [[ "$choice" =~ ^[Yy]$ ]]; then
+    read -rp "Enter your meaning: " meaning
+    echo "$WORD: $meaning" >> words.txt
+    echo -e "${GREEN}✅ Saved to local dictionary!${RESET}"
+  else
+    echo -e "${YELLOW}Tip:${RESET} Try checking your internet or adding it manually to words.txt"
+  fi
 fi
