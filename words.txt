@@ -1,0 +1,4 @@
+Linux: an open-source operating system kernel.
+Unix: a multitasking, multiuser computer operating system.
+Python: a high-level programming language.
+Shell: a command-line interface to interact with the OS.
